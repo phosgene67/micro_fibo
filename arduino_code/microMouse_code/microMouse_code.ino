@@ -1,12 +1,32 @@
-#include<iostream> 
-#include<raylib.h>
-using namespace std ; 
-const int row =15;
-const int col=15;
+const int row =8;
+const int col=8;
 const int maze_x=50;
 const int maze_y=50;
 const int cellsize=50;
 
+
+//
+// Ultrasonic sensor pins
+#define F_TRIG 2
+#define F_ECHO 3
+
+#define R_TRIG 4
+#define R_ECHO 5
+
+#define L_TRIG 6
+#define L_ECHO 7
+
+#define REAR_TRIG 8
+#define REAR_ECHO 9
+
+#define LIR 1
+#define MIR 2
+#define RIR 3
+
+    int sensorValues[3];
+    uint16_t sensorMin[3]=[0,0,0];
+    uint16_t sensorMax[3]=[1023,1023,1023];
+    uint16_t threshold[3]]=[512,512,512];
 enum Direction {
     UP = 0,
     RIGHT = 1,
@@ -34,9 +54,37 @@ struct sensor
 };
 
 Cell maze[row][col];
-bool visited[row][col];  // Track visited -> green marking
-bool shortestPath[row][col];  // Purple cells -> Dijkstra race route
+bool visited[row][col]; 
+bool shortestPath[row][col];  
 
+void readIR(uint8_t irsensor){
+    uint8_t sensorValues[0]= analogRead(LIR); 
+    uint8_t sensorValues[1]= analogRead(MIR);
+    uint8_t sensorValues[2]= analogRead(RIR); 
+}
+bool previousValue[3]={false ,false false};
+bool currentValue[3]={false,false,false}; 
+bool  stopdetector(uint8_t IRval){
+    readIR(); 
+    bool blackdetected = false;
+    for(i=0; i<3; i++){
+    if(IRval[i]<threshold[i] && IRval[i]>irmin[i]) {
+        return currentValue[i]=false; 
+    }
+    if(IRval[i]>threshold[i] && IRval[i]<irmax[i]){
+        return cuurrentValue[i]= true; 
+    }
+    ////here stil some work remains . need to set current value to previous value and comparing current value with previous value need to set previous value and then it will detect blackbox 
+ }
+ 
+}
+void sensorInit(){
+    FS();
+    RS();
+    LS();
+    rearS();
+    readIR();
+}
 class robot {
     public:
         int robotRow;
@@ -54,10 +102,10 @@ class robot {
 };
 
 void robot::robot_init() {
-    robotRow = 14;
+    robotRow = 0;
     robotCol = 0;
     robotDirection = UP;
-    
+    sensorInit();
     for(int r = 0; r < row; r++) {
         for(int c = 0; c < col; c++) {
             visited[r][c] = false;
@@ -68,18 +116,54 @@ void robot::robot_init() {
     
     cout << "Robot initialized at (" << robotRow << ", " << robotCol << ")" << endl;
 }
+float getDistance(int trigPin, int echoPin){
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
 
-// Check if robot can move to next position
-bool robot::canMove(int nextRow, int nextCol) {
-    if(nextRow < 0 || nextRow >= row || nextCol < 0 || nextCol >= col) {
-        return false;
-    }
-    
-    if(maze[nextRow][nextCol].wall) {
-        return false;
-    }
-    
-    return true;
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+
+    long duration = pulseIn(echoPin, HIGH, 30000);
+
+    if (duration == 0)
+        return 999.0;
+
+    float distance = duration * 0.0343 / 2.0;
+
+    return distance;
+}
+
+bool FS(){
+   //if front sensor  distance reading is greater that cell size . then it will detect gap .
+    float distance = getDistance(F_TRIG, F_ECHO);
+    if (distance > CELL_SIZE)
+        return true;
+
+    return false;
+ 
+}
+bool RS(){
+   //if right sensor  distance reading is greater that cell size . then it will detect gap .
+   float distance = getDistance(R_TRIG,R_ECHO);
+   if (distance<CELL_SIZE) return true; 
+
+   return false ; 
+}
+
+bool LS(){
+   //if left sensor  distance reading is greater that cell size . then it will detect gap .
+   float distance = getDistance(L_TRIG,L_ECHO);
+   if (distance<CELL_SIZE) return true; 
+   return false ; 
+}
+
+bool rearS(){
+   //if rear sensor  distance reading is greater that cell size . then it will detect gap .
+   float distance = getDistance(REAR_TRIG,REAR_ECHO);
+   if (distance<CELL_SIZE) return true; 
+
+   return false ; 
 }
 
 void robot::sensor() {
@@ -91,114 +175,35 @@ void robot::sensor() {
     switch(robotDirection) {
         
         case UP:  
-            // Front = check cell above (row - 1)
-            if(!canMove(robotRow - 1, robotCol)) {
-                robotSensor.FW_detected = true;
-            }
-            // Right = check cell to the right (col + 1)
-            if(!canMove(robotRow, robotCol + 1)) {
-                robotSensor.RW_detected = true;
-            }
-            // Left = check cell to the left (col - 1)
-            if(!canMove(robotRow, robotCol - 1)) {
-                robotSensor.LW_detected = true;
-            }
-            // Rear = check cell below (row + 1)
-            if(!canMove(robotRow + 1, robotCol)) {
-                robotSensor.RearW_detected = true;
-            }
+            if(!FS) {robotSensor.FW_detected = true; }
+            if(!RS) {robotSensor.RW_detected = true; }
+            if(!LS) {robotSensor.LW_detected = true;}
+            if(!rearS) {robotSensor.RearW_detected = true;}
             break;
             
         case DOWN:  
-            // Front = check cell below
-            if(!canMove(robotRow + 1, robotCol)) {
-                robotSensor.FW_detected = true;
-            }
-            // Right = check cell to the left
-            if(!canMove(robotRow, robotCol - 1)) {
-                robotSensor.RW_detected = true;
-            }
-            // Left = check cell to the right
-            if(!canMove(robotRow, robotCol + 1)) {
-                robotSensor.LW_detected = true;
-            }
-            // Rear = check cell above
-            if(!canMove(robotRow - 1, robotCol)) {
-                robotSensor.RearW_detected = true;
-            }
+            if(!rearS) {robotSensor.FW_detected = true;}
+            if(!LS) {robotSensor.RW_detected = true;}
+            if(!RS) {robotSensor.LW_detected = true;}
+            if(!FS) {robotSensor.RearW_detected = true;}
             break;
             
         case LEFT:  
-            // Front = check cell to the left
-            if(!canMove(robotRow, robotCol - 1)) {
-                robotSensor.FW_detected = true;
-            }
-            // Right = check cell above
-            if(!canMove(robotRow - 1, robotCol)) {
-                robotSensor.RW_detected = true;
-            }
-            // Left = check cell below
-            if(!canMove(robotRow + 1, robotCol)) {
-                robotSensor.LW_detected = true;
-            }
-            // Rear = check cell to the right
-            if(!canMove(robotRow, robotCol + 1)) {
-                robotSensor.RearW_detected = true;
-            }
+            if(!LS) {robotSensor.FW_detected = true;}
+            if(!FS) {robotSensor.RW_detected = true;}
+            if(!rearS) {robotSensor.LW_detected = true;}
+            if(!RS) {robotSensor.RearW_detected = true;}
             break;
             
         case RIGHT: 
-            // Front = check cell to the right
-            if(!canMove(robotRow, robotCol + 1)) {
-                robotSensor.FW_detected = true;
-            }
-            // Right = check cell below
-            if(!canMove(robotRow + 1, robotCol)) {
-                robotSensor.RW_detected = true;
-            }
-            // Left = check cell above
-            if(!canMove(robotRow - 1, robotCol)) {
-                robotSensor.LW_detected = true;
-            }
-            // Rear = check cell to the left
-            if(!canMove(robotRow, robotCol - 1)) {
-                robotSensor.RearW_detected = true;
-            }
+            if(!RS) {robotSensor.FW_detected = true;}
+            if(!rearS) {robotSensor.RW_detected = true;}
+            if(!FS) {robotSensor.LW_detected = true;}
+            if(!LS) {robotSensor.RearW_detected = true;}
             break;
     }
-}
 
-void robot::robot_movement() {
-    
-    if(IsKeyPressed(KEY_UP)) {
-        robotDirection = UP;
-        if(canMove(robotRow - 1, robotCol)) {
-            robotRow--;
-            visited[robotRow][robotCol] = true;
-        }
-    }
-    if(IsKeyPressed(KEY_DOWN)) {
-        robotDirection = DOWN;
-        if(canMove(robotRow + 1, robotCol)) {
-            robotRow++;
-            visited[robotRow][robotCol] = true;
-        }
-    }
-    if(IsKeyPressed(KEY_LEFT)) {
-        robotDirection = LEFT;
-        if(canMove(robotRow, robotCol - 1)) {
-            robotCol--;
-            visited[robotRow][robotCol] = true;
-        }
-    }
-    if(IsKeyPressed(KEY_RIGHT)) {
-        robotDirection = RIGHT;
-        if(canMove(robotRow, robotCol + 1)) {
-            robotCol++;
-            visited[robotRow][robotCol] = true;
-        }
-    }
-}
+
 void robot::algo_hunter() {
      // calls.  known[r][c] is: -1 = not seen yet, 0 = open, 1 = wall.
     static bool initialized = false;
@@ -426,191 +431,35 @@ void robot::algo_hunter() {
     }
 }
 
+
+
 robot myRobot;
-
-void drawcell(const Cell &cell , int row, int col) {
-            int x =maze_x + col* cellsize; 
-            int y =maze_y + row* cellsize; 
-            
-            if(cell.wall) {
-                DrawRectangle(x, y, cellsize, cellsize, BLACK);
-            }
-            else if(cell.isFinishBox) {
-                DrawRectangle(x, y, cellsize, cellsize, RED);
-            }
-            else if(cell.start){
-                DrawRectangle(x,y,cellsize,cellsize,BLUE);
-            }
-            else if(shortestPath[row][col]) {
-                DrawRectangle(x, y, cellsize,cellsize, PURPLE);
-            }
-            else if(visited[row][col]) {
-                DrawRectangle(x, y, cellsize, cellsize, GREEN);
-            }
-            
-            if(!cell.wall && !cell.isFinishBox && !cell.start) {
-                if(cell.top){
-                    DrawLine(x,y,x+cellsize,y,BLACK);
-                }
-                 if (cell.bottom){
-                        DrawLine(x,y+cellsize,x+cellsize,y+cellsize,BLACK);
-                }
-                 if (cell.left){
-                        DrawLine(x,y,x,y+cellsize,BLACK);
-                }
-                 if (cell.right){
-                        DrawLine(x+cellsize,y,x+cellsize,y+cellsize,BLACK);
-                }
-            }
-}
-
-void drawmaze(){
-    for(int r=0 ; r< row;r++)
-    {
-        for(int c=0 ; c<col;c++){
-            drawcell(maze[r][c],r,c);
-        }
-    }
-}
-
-void drawRobot() {
-    int x = maze_x + myRobot.robotCol * cellsize + cellsize/2; ///circle centre x,y
-    int y = maze_y + myRobot.robotRow * cellsize + cellsize/2;
-    
-    DrawCircle(x, y, 12, YELLOW); ///robot body 
-    
-//robot direction indication 
-    int dirX = x, dirY = y;
-    switch(myRobot.robotDirection) {
-        case UP:    dirY -= 15; break;
-        case DOWN:  dirY += 15; break;
-        case LEFT:  dirX -= 15; break;
-        case RIGHT: dirX += 15; break;
-    }
-    DrawLine(x, y, dirX, dirY, RED);
-}
-
-void maze_init(){
-    for(int r =0; r< row ; r++){
-        for (int c=0 ; c < col ; c++){
-            maze[r][c]={true,true,true,true,false,false,false};
-        }
-    }
-        // Top border walls
-    for(int c = 0; c < 15; c++) {
-        maze[0][c].wall = false;
-    }
-    
-    // Left border wall
-    for(int r = 0; r < 15; r++) {
-        maze[r][0].wall = false;
-    }
-    
-    // Complex maze walls
-    for(int c=1;c<14;c++){
-        maze[1][c].wall = true;
-    }
-    
-    for(int r=2;r<15;r++){
-        maze[r][1].wall=true;
-        if(r==12){
-            maze[r][1].wall=false;
-        }
-    } 
-    for(int r=0 ; r<15; r++){
-        if(r==0||r==2||r==8||r==14){
-            continue;
-        }
-        maze[r][3].wall=true;
-    }
-    for(int c=0;c<15;c++){
-        if(c==0||c==1||c==2||c==9||c==14){
-            continue;
-        }
-        maze[3][c].wall=true;
-    }
-    for(int r=0;r<15;r++){
-        if(r==0||r==2||r==3||r==10||r==14){
-            continue;
-        }
-        maze[r][13].wall=true;
-    }
-    for(int c=0;c<15;c++){
-        if(c==0||c==2||c==14){
-            continue;
-        }
-        maze[13][c].wall=true;
-    }
-   for(int c=0;c<15;c++){
-    if(c==0||c==1||c==2||c==3||c==4||c==14){
-        continue;
-    }
-    maze[7][c].wall=true;
-   }
-
-   for(int c=0;c<15;c++){
-    if(c==0||c==1||c==2||c==6||c==11||c==14){
-        continue;
-    }
-    maze[5][c].wall=true;
-   }
-
-   for(int r=8;r<12;r++){
-    maze[r][5].wall=true;
-   }
-   for(int r =8;r<12;r++) {
-    maze[r][11].wall=true;
-   }
-    maze[9][7].wall=true;
-    maze[9][8].wall=true;
-    maze[9][9].wall=true;
-    maze[10][9].wall=true;
-    maze[11][9].wall=true;
-    maze[12][9].wall=true;
-    maze[11][10].wall=true;
-    maze[11][6].wall=true;
-    maze[11][7].wall=true;
-
-    maze[14][0].start=true;
-    maze[10][10].isFinishBox = true;
-}
-
-int main () {
-     InitWindow(1000,850,"maze_solver"); 
-     SetTargetFPS(10);
-
-    maze_init();
+void setup() {
     myRobot.robot_init();
 
-     while(WindowShouldClose()== false) {
+    Serial.begin(9600);
 
+    pinMode(F_TRIG, OUTPUT);
+    pinMode(F_ECHO, INPUT);
+
+    pinMode(R_TRIG, OUTPUT);
+    pinMode(R_ECHO, INPUT);
+
+    pinMode(L_TRIG, OUTPUT);
+    pinMode(L_ECHO, INPUT);
+
+    pinMode(REAR_TRIG, OUTPUT);
+    pinMode(REAR_ECHO, INPUT);
+
+    pinMode(LIR,INPUT): 
+    pinMode(MIR,INPUT);
+    pinMode(RIR,INPUT); 
+
+
+}
+
+void loop() {
         myRobot.sensor();
         myRobot.robot_movement();       
         myRobot.algo_hunter();
-       
-        
-        
-        BeginDrawing();
-            ClearBackground(RAYWHITE);
-            drawmaze();
-            drawRobot();
-            
-            DrawText("=== SENSOR STATUS ===", 770, 10, 18, BLACK);
-            DrawText(TextFormat("Front Wall: %s", myRobot.robotSensor.FW_detected ? "YES" : "NO"), 850, 35, 15, BLACK);
-            DrawText(TextFormat("Right Wall: %s", myRobot.robotSensor.RW_detected ? "YES" : "NO"), 850, 55, 15, BLACK);
-            DrawText(TextFormat("Left Wall:  %s", myRobot.robotSensor.LW_detected ? "YES" : "NO"),850, 75, 15, BLACK);
-            DrawText(TextFormat("Rear Wall:  %s", myRobot.robotSensor.RearW_detected ? "YES" : "NO"), 850, 95, 15, BLACK);
-            
-            DrawText("=== ROBOT STATUS ===", 800, 130, 18, BLACK);
-            DrawText(TextFormat("Position:[%d],[%d]", myRobot.robotRow, myRobot.robotCol), 800, 155, 15, BLACK);
-            const char* dirStr[] = {"UP", "RIGHT", "DOWN", "LEFT"};
-            DrawText(TextFormat("Direction: %s", dirStr[myRobot.robotDirection]), 800, 175, 15, BLACK);
-            
-            DrawText("Press Space", 800, 210, 14, DARKGRAY);
-            
-            EndDrawing();
-            
-     }
-     CloseWindow();
-     return 0 ; 
 }
